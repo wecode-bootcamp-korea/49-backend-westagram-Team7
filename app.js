@@ -2,10 +2,11 @@ const http = require('http')
 const express = require('express')
 const { DataSource } = require('typeorm');
 const cors = require('cors')
-// const jwt = require();
+const jwt = require('jsonwebtoken');
 const { async } = require('regenerator-runtime');
 const { addYears } = require('date-fns');
 const status = require('statuses');
+const { id } = require('date-fns/locale');
 
 const myDataSource = new DataSource({
   type: 'mysql',
@@ -107,6 +108,7 @@ app.post("/login", async(req, res) => {
   try {
     const email = req.body.email
     const password = req.body.password
+    const token = jwt.sign({id: id }, 'wecode')
     console.log(req.body);
   
     if (!email || !password ) {
@@ -117,28 +119,19 @@ app.post("/login", async(req, res) => {
 
     const alreadyEmail = await myDataSource.query(`SELECT id, email FROM users WHERE 1=1 and email = "${email}" and password = "${password}"`)
 
+
+    if (!alreadyEmail.length){
+      const error = new Error("ERROR_email_password")
+      error.statusCode = 400
+      throw error
+    }
+
        if (alreadyEmail.length) {
         return res.status(200).json({ 
           "message" : "LOGIN_SUCCESS",
-          // "accessToken" : token
+          "accessToken" : token
         })
       } ;
-
-      if (!alreadyEmail.length){
-        const error = new Error("ERROR_email_password")
-        error.statusCode = 400
-        throw error
-      }
-    
-  
-    // generate token
-    // 1. use library allowing generating token
-    // 2. {"id": 10} // 1hour
-    // const token = jwt.sign({id:____}, 'scret_key')
-    // 3. signature
-
-
-    
     
   } catch (error) {
     console.log(error)
