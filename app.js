@@ -1,9 +1,11 @@
 const http = require('http')
 const express = require('express')
 const { DataSource } = require('typeorm');
+const cors = require('cors')
+// const jwt = require();
 const { async } = require('regenerator-runtime');
 const { addYears } = require('date-fns');
-// const DataSource = myDataSource.query(`SELECT * FROM USERS`)
+const status = require('statuses');
 
 const myDataSource = new DataSource({
   type: 'mysql',
@@ -21,6 +23,9 @@ myDataSource.initialize()
 
 const app = express()
 
+app.use(cors())
+app.use(express.json()) 
+
 app.get("/", async(req, res) => {
   try {
     return res.status(200).json({"message": "Welcome to Suhan's server!"})
@@ -29,12 +34,9 @@ app.get("/", async(req, res) => {
   }
 })
 
-
-app.use(express.json()) 
-
 app.get('/users',async(req, res)=> {
   try {
-      const userData = await myDataSource.query(`SELECT id, name, email, profile_image FROM USERS`)
+      const userData = await myDataSource.query(`SELECT id, name, email FROM users`)
 
     console.log("USER DATA :", userData)
 
@@ -50,34 +52,42 @@ app.post("/users", async(req, res)=> {
   try {
     const me = req.body
 
-    console.log("Me: ", me)
+    const { name, password, email } = me 
 
-    const name2 = me.name
-    const password2 = me.password
-    const email2 = me.email
-    const profile_image = me.profile_image
+    if (!email || !name || !password) {
+      const error = new Error("KEY_ERROR")
+      error.statusCode = 400
+      throw error
+    }
 
-    if (password2.length <8) {
+
+    if (password.length <8) {
       const error = new Error("INVALID_PASSWORD")
       error.statusCode = 400
       throw error 
-    }
+    } ;
+
+    const existingUser = await myDataSource.query(`
+      SELECT email FROM users WHERE email = ?`,email)
+
+    if (existingUser.length) {
+      const error = new Error("SAME_EMAIL")
+      error.statusCode = 400
+      throw error
+    } ;
 
     const userData = await myDataSource.query(`
     INSERT INTO users (
       name, 
       password,
-      email,
-      profile_image
-
+      email
     )
     VALUES (
-      '${name2}',
-      '${password2}', 
-      '${email2}',
-      '${profile_image}'
+      '${name}',
+      '${password}', 
+      '${email}'  
     )
-  `)
+  `);
 
   console.log('iserted user id', userData.insertId)
 
@@ -91,6 +101,49 @@ app.post("/users", async(req, res)=> {
       "message": error.message
     })
   }
+})
+
+app.post("/login", async(req, res) => {
+  try {
+    const email = req.body.email
+    const password = req.body.password
+    console.log(req.body);
+  
+    if (!email || !password ) {
+      const error = new Error("KEY_ERROR")
+      error.statusCode = 400
+      throw error
+    };
+
+    const alreadyEmail = await myDataSource.query(`SELECT id, email FROM users WHERE 1=1 and email = "${email}" and password = "${password}"`)
+
+       if (alreadyEmail.length) {
+        return res.status(200).json({ 
+          "message" : "LOGIN_SUCCESS",
+          // "accessToken" : token
+        })
+      } ;
+
+      if (!alreadyEmail.length){
+        const error = new Error("ERROR_email_password")
+        error.statusCode = 400
+        throw error
+      }
+    
+  
+    // generate token
+    // 1. use library allowing generating token
+    // 2. {"id": 10} // 1hour
+    // const token = jwt.sign({id:____}, 'scret_key')
+    // 3. signature
+
+
+    
+    
+  } catch (error) {
+    console.log(error)
+  }
+  
 })
 
 const server = http.createServer(app) 
